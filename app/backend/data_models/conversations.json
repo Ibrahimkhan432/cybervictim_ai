@@ -1,0 +1,27 @@
+{
+    "title": "conversations",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "title": {
+            "type": "string"
+        },
+        "crime_type": {
+            "type": "string"
+        },
+        "is_child_safety": {
+            "type": "boolean",
+            "default": false
+        },
+        "user_id": {
+            "type": "string",
+            "description": "System-managed owner user ID"
+        }
+    },
+    "required": [
+        "title",
+        "user_id"
+    ]
+}

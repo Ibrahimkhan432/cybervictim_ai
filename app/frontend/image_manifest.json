@@ -1,0 +1,37 @@
+{
+  "status": "partial_success",
+  "results": [
+    {
+      "status": "success",
+      "filename": "hero-cybershield-protection.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrpiicaijq/hero-cybershield-protection.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrpiicaijq/hero-cybershield-protection.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrpiicaijq/hero-cybershield-protection.png"
+    },
+    {
+      "status": "success",
+      "filename": "logo-cybershield-ai.png",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrpvacaikq/logo-cybershield-ai.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrpvacaikq/logo-cybershield-ai.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrpvacaikq/logo-cybershield-ai.png"
+    },
+    {
+      "status": "success",
+      "filename": "legal-guidance-peca-law.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrqsycailq/legal-guidance-peca-law.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrqsycailq/legal-guidance-peca-law.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjrqsycailq/legal-guidance-peca-law.png"
+    },
+    {
+      "status": "success",
+      "filename": "child-safety-parental-guidance.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjto3qcaika/child-safety-parental-guidance.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjto3qcaika/child-safety-parental-guidance.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/872104/2026-06-29/rpjto3qcaika/child-safety-parental-guidance.png"
+    }
+  ],
+  "success_count": 4,
+  "failed_count": 1,
+  "running_count": 0,
+  "message": "Generated 4/5 images total"
+}
