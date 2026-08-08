@@ -29,6 +29,8 @@ import {
   AUTHORITY_REFERRALS,
   PECA_SECTIONS,
   QUICK_TOPICS,
+  OFF_TOPIC_REFUSAL_MESSAGE,
+  isOffTopicRequest,
   type CrimeType,
 } from "@/lib/knowledge-base";
 
@@ -141,6 +143,18 @@ export default function Chat() {
       crimeType: detectedCrime,
       timestamp: new Date(),
     };
+
+    if (isOffTopicRequest(text)) {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: OFF_TOPIC_REFUSAL_MESSAGE,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setInput("");
+      return;
+    }
 
     const detected = detectCrimeType(text);
     if (detected && !detectedCrime) {

@@ -28,6 +28,8 @@ import {
   EVIDENCE_CHECKLISTS,
   PECA_SECTIONS,
   CHILD_SAFETY_PROMPT,
+  OFF_TOPIC_REFUSAL_MESSAGE,
+  isOffTopicRequest,
 } from "@/lib/knowledge-base";
 
 const client = createClient();
@@ -75,6 +77,23 @@ export default function ChildSafety() {
       content: text.trim(),
       timestamp: new Date(),
     };
+
+    if (isOffTopicRequest(text)) {
+      const assistantReply: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: OFF_TOPIC_REFUSAL_MESSAGE,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, userMessage, assistantReply]);
+      setInput("");
+      setIsLoading(false);
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 50);
+      return;
+    }
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
@@ -148,12 +167,25 @@ export default function ChildSafety() {
     sendMessage(input);
   };
 
-  const quickTopics = [
+  const childQuickTopics = [
+    "Someone is hurting me",
+    "I saw something scary online",
+    "I need to talk to someone",
+    "what should i do if someone is asking for my personal info",
+    "how to block someone online",
+    "how to report cyberbullying",
+    "what to do if someone is threatening me online",
+    "how to stay safe on social media",
+  ];
+
+  const parentQuickTopics = [
     "My child is being cyberbullied",
     "Someone is grooming my child online",
     "My child received inappropriate messages",
     "How to report online predators",
   ];
+
+  const quickTopics = activeTab === "children" ? childQuickTopics : parentQuickTopics;
 
   return (
     <div className="min-h-screen bg-background">

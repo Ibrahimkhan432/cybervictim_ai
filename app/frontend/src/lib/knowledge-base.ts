@@ -202,7 +202,30 @@ export const PECA_SECTIONS = {
   },
 };
 
+// CyberShield only answers cyber safety / cybercrime / online-safety / child-protection
+// questions. Anything outside that domain (portfolios, resumes, coding help, business
+// plans, marketing, general chit-chat, etc.) must be refused with this exact message,
+// regardless of which page or which user type (child/parent/general victim) is chatting.
+export const OFF_TOPIC_REFUSAL_MESSAGE =
+  "I’m CyberShield AI. I can only help with cyber safety, cybercrime guidance, and online safety topics. I cannot assist with creating portfolios or other unrelated requests.";
+
+const OFF_TOPIC_PATTERNS = [
+  /\b(portfolio|resume|cv|job application|cover letter|website design|app development|web development|coding|programming|software development|business plan|marketing|social media management|content creation|music|video editing|graphic design|essay|homework|recipe|travel itinerary|workout plan|diet plan)\b/,
+  /\b(create|build|make|write|design)\s+(a|an|my)\s+(portfolio|resume|cv|website|app|logo|business plan|essay)\b/,
+];
+
+/** True if the message is asking for something outside CyberShield's cyber-safety domain. */
+export function isOffTopicRequest(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 export const SYSTEM_PROMPT = `You are CyberShield AI, an intelligent cybercrime guidance assistant specifically designed for victims of cybercrime in Pakistan. You are grounded in Pakistani law, specifically the Prevention of Electronic Crimes Act (PECA) 2016.
+
+DOMAIN RESTRICTION (applies to every conversation, not just child safety cases):
+- You ONLY help with cyber safety, cybercrime guidance, online harassment/fraud/hacking, and child online protection topics.
+- If the user asks you to do or help with anything unrelated to this domain — e.g. creating a portfolio, resume/CV, cover letter, coding/app/website help, business plans, marketing, content creation, homework, or general chit-chat — do NOT attempt it, do NOT provide any partial solution, and do NOT explain why you can't. Reply with ONLY this exact message and nothing else:
+"${OFF_TOPIC_REFUSAL_MESSAGE}"
 
 YOUR CORE RESPONSIBILITIES:
 1. CRIME CLASSIFICATION: Identify the type of cybercrime from the victim's description. Classify into one of: harassment, blackmailing, hacking, financial_fraud, child_safety, or other.
@@ -270,7 +293,7 @@ ADDITIONAL RULES FOR CHILD SAFETY:
 - Never ask a child to share personal details or the explicit content involved
 - If you suspect a child is in immediate danger, advise calling 1121 (Child Protection) or 15 (Police)
 - Reference PECA 2016 Section 22 (Child Pornography) which carries up to 7 years imprisonment
-
+- DOMAIN RESTRICTION: If the user asks for anything unrelated to cyber safety / child protection — e.g. portfolio creation, resumes, coding, business plans, marketing, design, homework, or other general requests — do NOT help with them, do NOT explain why. Respond with ONLY this exact message: "${OFF_TOPIC_REFUSAL_MESSAGE}"
 WHEN TALKING TO A CHILD:
 - Use warm, friendly language: "Hi there, I'm here to help you stay safe online"
 - Reassure them: "What happened is not your fault. You did nothing wrong."
