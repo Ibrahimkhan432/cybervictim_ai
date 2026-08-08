@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { createClient } from "@metagptx/web-sdk";
+import { streamGenTxt } from "@/lib/aihub";
 import {
   Send,
   Shield,
@@ -33,8 +33,6 @@ import {
   isOffTopicRequest,
   type CrimeType,
 } from "@/lib/knowledge-base";
-
-const client = createClient();
 
 interface Message {
   id: string;
@@ -178,11 +176,9 @@ export default function Chat() {
     let fullContent = "";
 
     try {
-      await client.ai.gentxt({
+      await streamGenTxt({
         messages: aiMessages,
-        model: "gemini-2.5-pro",
-        stream: true,
-        onChunk: (chunk: any) => {
+        onChunk: (chunk) => {
           fullContent += chunk.content || "";
           setMessages((prev) => {
             const existing = prev.find((m) => m.id === assistantId);

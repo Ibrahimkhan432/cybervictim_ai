@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { createClient } from "@metagptx/web-sdk";
+import { streamGenTxt } from "@/lib/aihub";
 import {
   Shield,
   Baby,
@@ -31,8 +31,6 @@ import {
   OFF_TOPIC_REFUSAL_MESSAGE,
   isOffTopicRequest,
 } from "@/lib/knowledge-base";
-
-const client = createClient();
 
 interface ChatMessage {
   id: string;
@@ -109,11 +107,9 @@ export default function ChildSafety() {
     let fullContent = "";
 
     try {
-      await client.ai.gentxt({
+      await streamGenTxt({
         messages: aiMessages,
-        model: "gemini-2.5-pro",
-        stream: true,
-        onChunk: (chunk: any) => {
+        onChunk: (chunk) => {
           fullContent += chunk.content || "";
           setMessages((prev) => {
             const existing = prev.find((m) => m.id === assistantId);
