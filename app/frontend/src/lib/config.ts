@@ -13,9 +13,21 @@ const defaultConfig = {
 
 // Function to load runtime configuration
 export async function loadRuntimeConfig(): Promise<void> {
+  // If a build-time API base URL was provided (e.g. VITE_API_BASE_URL set on the
+  // hosting platform for a split frontend/backend deployment like Render), trust
+  // it outright and skip the same-origin /api/config probe below entirely — that
+  // probe only makes sense when frontend and backend share a domain (e.g. Lambda),
+  // and otherwise just produces a confusing same-origin 404.
+  if (import.meta.env.VITE_API_BASE_URL) {
+    configLoading = false;
+    console.log('Using build-time VITE_API_BASE_URL, skipping /api/config probe');
+    return;
+  }
+
   try {
     console.log('🔧 DEBUG: Starting to load runtime config...');
-    // Try to load configuration from a config endpoint
+    // Try to load configuration from a same-origin config endpoint (combined
+    // frontend+backend deployments only, e.g. Lambda serving both).
     const response = await fetch('/api/config');
     if (response.ok) {
       const contentType = response.headers.get('content-type');
