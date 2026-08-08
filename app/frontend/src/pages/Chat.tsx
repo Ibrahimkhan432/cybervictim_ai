@@ -91,6 +91,13 @@ function detectCrimeType(text: string): CrimeType | undefined {
   return undefined;
 }
 
+// Cap how much prior conversation gets sent back to the model each turn.
+// Without this the payload (and provider processing time) grows unbounded
+// as a conversation gets longer, for little quality benefit beyond the
+// last several exchanges — the system prompt already carries the fixed
+// context the model needs.
+const MAX_HISTORY_MESSAGES = 12;
+
 function extractCrimeTypeFromResponse(text: string): CrimeType | undefined {
   const crimeMatch = text.match(/\*\*Crime Type:\*\*\s*(\w[\w\s]*?)(?:\n|$)/i);
   if (crimeMatch) {
@@ -111,6 +118,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
   const [detectedCrime, setDetectedCrime] = useState<CrimeType | undefined>(
     (searchParams.get("type") as CrimeType) || undefined
   );
@@ -168,17 +176,22 @@ export default function Chat() {
 
     const aiMessages = [
       { role: "system" as const, content: systemPrompt },
-      ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ...messages
+        .slice(-MAX_HISTORY_MESSAGES)
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user" as const, content: text.trim() },
     ];
 
     const assistantId = (Date.now() + 1).toString();
     let fullContent = "";
+    setIsSlowConnection(false);
 
     try {
       await streamGenTxt({
         messages: aiMessages,
+        onSlowConnection: () => setIsSlowConnection(true),
         onChunk: (chunk) => {
+          setIsSlowConnection(false);
           fullContent += chunk.content || "";
           setMessages((prev) => {
             const existing = prev.find((m) => m.id === assistantId);
@@ -200,6 +213,7 @@ export default function Chat() {
         },
         onComplete: () => {
           setIsLoading(false);
+          setIsSlowConnection(false);
           const extracted = extractCrimeTypeFromResponse(fullContent);
           if (extracted && !detectedCrime) {
             setDetectedCrime(extracted);
@@ -210,15 +224,18 @@ export default function Chat() {
             )
           );
         },
-        onError: () => {
+        onError: (error) => {
           setIsLoading(false);
+          setIsSlowConnection(false);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
                 ? {
                     ...m,
                     content:
-                      "I apologize, but I'm having trouble connecting right now. Please try again. If you're in immediate danger, please call 15 (Police) or 1122 (Emergency).",
+                      error.message.includes("timed out")
+                        ? error.message
+                        : "I apologize, but I'm having trouble connecting right now. Please try again. If you're in immediate danger, please call 15 (Police) or 1122 (Emergency).",
                   }
                 : m
             )
@@ -227,6 +244,7 @@ export default function Chat() {
       });
     } catch {
       setIsLoading(false);
+      setIsSlowConnection(false);
     }
   };
 
@@ -385,6 +403,11 @@ export default function Chat() {
                     <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
                     <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
                   </div>
+                  {isSlowConnection && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Waking up the server — this can take up to a minute on first use.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

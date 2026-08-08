@@ -7,6 +7,7 @@ and speech transcription API endpoints.
 import ast
 import json
 import logging
+import time
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, status
@@ -125,6 +126,8 @@ async def generate_text(
     - stream=false: return a full JSON response
     - stream=true: return an SSE streaming response
     """
+    request_received_at = time.monotonic()
+    logger.info("[TIMING] /gentxt request received")
     try:
         service = AIHubService()
 
@@ -139,12 +142,20 @@ async def generate_text(
                     logger.error(f"Stream error: {e}")
                     yield json.dumps({"content": f"[ERROR] {extract_error_message(e)}"})
                 finally:
+                    logger.info(
+                        f"[TIMING] /gentxt total (request received -> stream closed): "
+                        f"{time.monotonic() - request_received_at:.3f}s"
+                    )
                     yield "[DONE]"
 
             return EventSourceResponse(event_generator(), media_type="text/event-stream")
         else:
             # Non-streaming response
             response = await service.gentxt(request)
+            logger.info(
+                f"[TIMING] /gentxt total (request received -> response ready): "
+                f"{time.monotonic() - request_received_at:.3f}s"
+            )
             return response
 
     except ValueError as e:

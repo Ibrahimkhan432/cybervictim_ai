@@ -16,6 +16,7 @@ from fastapi.routing import APIRouter
 from services.database import initialize_database, close_database
 from services.mock_data import initialize_mock_data
 from services.auth import initialize_admin_user
+from services.aihub import close_http_client as close_aihub_http_client
 # MODULE_IMPORTS_END
 
 
@@ -77,6 +78,7 @@ async def lifespan(app: FastAPI):
     yield
     # MODULE_SHUTDOWN_START
     await close_database()
+    await close_aihub_http_client()
     # MODULE_SHUTDOWN_END
 
 

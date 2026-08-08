@@ -39,6 +39,11 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// Cap how much prior conversation gets sent back to the model each turn —
+// otherwise the payload (and provider processing time) grows unbounded as
+// the conversation gets longer, for little benefit beyond recent context.
+const MAX_HISTORY_MESSAGES = 12;
+
 export default function ChildSafety() {
   const [activeTab, setActiveTab] = useState<"parents" | "children">("parents");
   const contentRef = useRef<HTMLDivElement>(null);
@@ -48,6 +53,7 @@ export default function ChildSafety() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,17 +105,22 @@ export default function ChildSafety() {
 
     const aiMessages = [
       { role: "system" as const, content: CHILD_SAFETY_PROMPT },
-      ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ...messages
+        .slice(-MAX_HISTORY_MESSAGES)
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       { role: "user" as const, content: text.trim() },
     ];
 
     const assistantId = (Date.now() + 1).toString();
     let fullContent = "";
+    setIsSlowConnection(false);
 
     try {
       await streamGenTxt({
         messages: aiMessages,
+        onSlowConnection: () => setIsSlowConnection(true),
         onChunk: (chunk) => {
+          setIsSlowConnection(false);
           fullContent += chunk.content || "";
           setMessages((prev) => {
             const existing = prev.find((m) => m.id === assistantId);
@@ -132,21 +143,24 @@ export default function ChildSafety() {
         },
         onComplete: () => {
           setIsLoading(false);
+          setIsSlowConnection(false);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId ? { ...m, content: fullContent } : m
             )
           );
         },
-        onError: () => {
+        onError: (error) => {
           setIsLoading(false);
+          setIsSlowConnection(false);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
                 ? {
                     ...m,
-                    content:
-                      "I apologize, but I'm having trouble connecting right now. Please try again. If you're in immediate danger, please call 15 (Police) or 1121 (Child Protection).",
+                    content: error.message.includes("timed out")
+                      ? error.message
+                      : "I apologize, but I'm having trouble connecting right now. Please try again. If you're in immediate danger, please call 15 (Police) or 1121 (Child Protection).",
                   }
                 : m
             )
@@ -155,6 +169,7 @@ export default function ChildSafety() {
       });
     } catch {
       setIsLoading(false);
+      setIsSlowConnection(false);
     }
   };
 
@@ -423,6 +438,7 @@ export default function ChildSafety() {
                   input={input}
                   setInput={setInput}
                   isLoading={isLoading}
+                  isSlowConnection={isSlowConnection}
                   handleSubmit={handleSubmit}
                   sendMessage={sendMessage}
                   quickTopics={quickTopics}
@@ -569,6 +585,7 @@ function InlineChat({
   input,
   setInput,
   isLoading,
+  isSlowConnection,
   handleSubmit,
   sendMessage,
   quickTopics,
@@ -579,6 +596,7 @@ function InlineChat({
   input: string;
   setInput: (v: string) => void;
   isLoading: boolean;
+  isSlowConnection: boolean;
   handleSubmit: (e: React.FormEvent) => void;
   sendMessage: (text: string) => void;
   quickTopics: string[];
@@ -659,6 +677,11 @@ function InlineChat({
                   <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce [animation-delay:0.2s]" />
                   <span className="w-2 h-2 bg-pink-400 rounded-full animate-bounce [animation-delay:0.4s]" />
                 </div>
+                {isSlowConnection && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Waking up the server — this can take up to a minute on first use.
+                  </p>
+                )}
               </div>
             </div>
           )}

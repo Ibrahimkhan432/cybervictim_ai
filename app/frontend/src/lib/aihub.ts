@@ -11,6 +11,20 @@ interface StreamGenTxtParams {
   onChunk?: (chunk: { content: string }) => void;
   onComplete?: (result: { content: string }) => void;
   onError?: (error: Error) => void;
+  /**
+   * Fired once if no data has arrived within `slowConnectionMs` — a useful
+   * signal to show a "waking up the server..." hint, since Render's free
+   * tier can take 30-60s to cold-start after being idle. Not an error by
+   * itself; the request keeps waiting up to `timeoutMs`.
+   */
+  onSlowConnection?: () => void;
+  /** Hard ceiling for the whole request before it's aborted. Default 100s —
+   * generous enough to cover a Render free-tier cold start plus a full
+   * generation, but bounded so a genuinely stuck request fails with a clear
+   * error instead of spinning forever. */
+  timeoutMs?: number;
+  /** How long to wait with no bytes received before firing onSlowConnection. */
+  slowConnectionMs?: number;
 }
 
 /**
@@ -30,15 +44,26 @@ export async function streamGenTxt({
   onChunk,
   onComplete,
   onError,
+  onSlowConnection,
+  timeoutMs = 100_000,
+  slowConnectionMs = 8_000,
 }: StreamGenTxtParams): Promise<{ content: string }> {
   const baseUrl = getAPIBaseURL().replace(/\/$/, "");
   let fullContent = "";
+
+  const controller = new AbortController();
+  const hardTimeout = setTimeout(() => controller.abort(), timeoutMs);
+  const slowTimer = onSlowConnection ? setTimeout(onSlowConnection, slowConnectionMs) : undefined;
+  const clearSlowTimer = () => {
+    if (slowTimer) clearTimeout(slowTimer);
+  };
 
   try {
     const response = await fetch(`${baseUrl}/api/v1/aihub/gentxt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages, model, stream: true }),
+      signal: controller.signal,
     });
 
     if (!response.ok || !response.body) {
@@ -52,7 +77,11 @@ export async function streamGenTxt({
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      clearSlowTimer();
+      // sse_starlette (the backend's SSE library) separates events with
+      // "\r\n\r\n" (CRLF+CRLF), not "\n\n" — normalize to LF so the split
+      // below matches regardless of which line ending arrives.
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
 
       // SSE events are separated by a blank line; keep any trailing partial
       // event in the buffer until more bytes arrive.
@@ -89,8 +118,17 @@ export async function streamGenTxt({
     onComplete?.(result);
     return result;
   } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
+    const isAbort = err instanceof DOMException && err.name === "AbortError";
+    const error = isAbort
+      ? new Error("Request timed out. The server may be slow to respond right now — please try again.")
+      : err instanceof Error
+        ? err
+        : new Error(String(err));
     onError?.(error);
     throw error;
+  } finally {
+    clearTimeout(hardTimeout);
+    clearSlowTimer();
+
   }
 }

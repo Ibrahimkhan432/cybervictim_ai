@@ -4,8 +4,10 @@ Implements AIHubService that wraps any OpenAI-compatible AI provider (e.g. Groq)
 Uses httpx directly to avoid any openai SDK version issues.
 """
 
+import asyncio
 import json
 import logging
+import time
 from typing import AsyncGenerator, Optional
 
 import httpx
@@ -27,6 +29,47 @@ from schemas.aihub import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Shared HTTP client
+#
+# A fresh httpx.AsyncClient() used to be created (and torn down) on every
+# single request. Each one pays for a brand-new TCP handshake + TLS
+# negotiation to the AI provider before the first token can even be
+# requested — pure latency, repeated on every chat message. Reusing one
+# process-wide client lets httpx keep the connection alive (HTTP keep-alive)
+# between requests, which is the single biggest lever for consistent
+# response times on a host with variable network conditions (e.g. Render
+# free tier).
+#
+# Timeouts are split by phase instead of one flat value applied to
+# connect+read+write+pool alike: connect/write/pool fail fast (a hung TCP
+# handshake shouldn't cost the user 60-120s before anything happens), while
+# read stays generous enough for the provider to actually generate.
+# ---------------------------------------------------------------------------
+_AI_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=10.0, pool=10.0)
+_AI_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=30.0)
+
+_shared_client: Optional[httpx.AsyncClient] = None
+_shared_client_lock = asyncio.Lock()
+
+
+async def _get_shared_client() -> httpx.AsyncClient:
+    """Return the process-wide reusable httpx.AsyncClient, creating it lazily."""
+    global _shared_client
+    if _shared_client is None or _shared_client.is_closed:
+        async with _shared_client_lock:
+            if _shared_client is None or _shared_client.is_closed:
+                _shared_client = httpx.AsyncClient(timeout=_AI_TIMEOUT, limits=_AI_LIMITS)
+    return _shared_client
+
+
+async def close_http_client() -> None:
+    """Close the shared client. Call this from the app's shutdown/lifespan handler."""
+    global _shared_client
+    if _shared_client is not None and not _shared_client.is_closed:
+        await _shared_client.aclose()
+    _shared_client = None
 
 
 class InvalidImageInputError(Exception):
@@ -106,14 +149,16 @@ class AIHubService:
 
         logger.debug(f"gentxt: model={model}, messages={len(messages)}")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers=self._headers,
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
+        t0 = time.monotonic()
+        client = await _get_shared_client()
+        response = await client.post(
+            f"{self.base_url}/chat/completions",
+            headers=self._headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        logger.info(f"[TIMING] gentxt provider call: {time.monotonic() - t0:.3f}s")
 
         content = data["choices"][0]["message"]["content"] or ""
         usage = data.get("usage")
@@ -134,28 +179,35 @@ class AIHubService:
 
         logger.debug(f"gentxt_stream: model={model}, messages={len(messages)}")
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream(
-                "POST",
-                f"{self.base_url}/chat/completions",
-                headers=self._headers,
-                json=payload,
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    line = line.strip()
-                    if not line or line == "data: [DONE]":
-                        continue
-                    if line.startswith("data: "):
-                        line = line[6:]
-                    try:
-                        chunk = json.loads(line)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content")
-                        if content:
-                            yield content
-                    except (json.JSONDecodeError, IndexError, KeyError):
-                        continue
+        t0 = time.monotonic()
+        first_chunk_at: Optional[float] = None
+        client = await _get_shared_client()
+        async with client.stream(
+            "POST",
+            f"{self.base_url}/chat/completions",
+            headers=self._headers,
+            json=payload,
+        ) as response:
+            response.raise_for_status()
+            logger.info(f"[TIMING] provider connection established: {time.monotonic() - t0:.3f}s")
+            async for line in response.aiter_lines():
+                line = line.strip()
+                if not line or line == "data: [DONE]":
+                    continue
+                if line.startswith("data: "):
+                    line = line[6:]
+                try:
+                    chunk = json.loads(line)
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        if first_chunk_at is None:
+                            first_chunk_at = time.monotonic()
+                            logger.info(f"[TIMING] provider time-to-first-token: {first_chunk_at - t0:.3f}s")
+                        yield content
+                except (json.JSONDecodeError, IndexError, KeyError):
+                    continue
+        logger.info(f"[TIMING] provider stream total: {time.monotonic() - t0:.3f}s")
 
     async def genimg(self, request: GenImgRequest) -> GenImgResponse:
         raise NotImplementedError(
