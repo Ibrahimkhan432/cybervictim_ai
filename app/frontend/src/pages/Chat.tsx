@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import Header from "@/components/Header";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { detectLanguage, formatResponseByLanguage } from "@/lib/language-utils";
 import {
   SYSTEM_PROMPT,
   CHILD_SAFETY_PROMPT,
@@ -40,6 +41,7 @@ interface Message {
   content: string;
   crimeType?: CrimeType;
   timestamp: Date;
+  language?: "urdu" | "english";
 }
 
 function detectCrimeType(text: string): CrimeType | undefined {
@@ -142,12 +144,16 @@ export default function Chat() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
+    // Detect language of user input
+    const inputLanguage = detectLanguage(text);
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: text.trim(),
       crimeType: detectedCrime,
       timestamp: new Date(),
+      language: inputLanguage,
     };
 
     if (isOffTopicRequest(text)) {
@@ -156,6 +162,7 @@ export default function Chat() {
         role: "assistant",
         content: OFF_TOPIC_REFUSAL_MESSAGE,
         timestamp: new Date(),
+        language: inputLanguage,
       };
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput("");
@@ -207,6 +214,7 @@ export default function Chat() {
                 role: "assistant" as const,
                 content: fullContent,
                 timestamp: new Date(),
+                language: inputLanguage,
               },
             ];
           });
@@ -218,9 +226,11 @@ export default function Chat() {
           if (extracted && !detectedCrime) {
             setDetectedCrime(extracted);
           }
+          // Format response based on detected language
+          const formattedContent = formatResponseByLanguage(fullContent, inputLanguage);
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId ? { ...m, content: fullContent, crimeType: extracted } : m
+              m.id === assistantId ? { ...m, content: formattedContent, crimeType: extracted, language: inputLanguage } : m
             )
           );
         },
@@ -236,6 +246,7 @@ export default function Chat() {
                       error.message.includes("timed out")
                         ? error.message
                         : "I apologize, but I'm having trouble connecting right now. Please try again. If you're in immediate danger, please call 15 (Police) or 1122 (Emergency).",
+                    language: inputLanguage,
                   }
                 : m
             )
@@ -365,9 +376,11 @@ export default function Chat() {
                 >
                   <div className="text-sm leading-relaxed prose-sm">
                     {msg.role === "assistant" ? (
-                      <MarkdownRenderer content={msg.content} />
+                      <MarkdownRenderer content={msg.content} language={msg.language || "english"} />
                     ) : (
-                      <span className="whitespace-pre-wrap">{msg.content}</span>
+                      <span className={`whitespace-pre-wrap block ${msg.language === "urdu" ? "text-right" : "text-left"}`}>
+                        {msg.content}
+                      </span>
                     )}
                   </div>
                   {msg.role === "assistant" && msg.crimeType && (
@@ -405,7 +418,8 @@ export default function Chat() {
                   </div>
                   {isSlowConnection && (
                     <p className="text-xs text-muted-foreground mt-2">
-                      Waking up the server — this can take up to a minute on first use.
+                       Please wait a moment — since this is your first visit, we’re getting the platform ready for you.
+
                     </p>
                   )}
                 </div>

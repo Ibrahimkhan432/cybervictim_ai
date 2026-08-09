@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import Header from "@/components/Header";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { detectLanguage, formatResponseByLanguage } from "@/lib/language-utils";
 import {
   SAFETY_TIPS_FOR_CHILDREN,
   SAFETY_TIPS_FOR_PARENTS,
@@ -37,6 +38,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  language?: "urdu" | "english";
 }
 
 // Cap how much prior conversation gets sent back to the model each turn —
@@ -59,6 +61,12 @@ export default function ChildSafety() {
 
   const handleTabSwitch = (tab: "parents" | "children") => {
     setActiveTab(tab);
+    // Reset chat when switching tabs
+    setChatOpen(false);
+    setMessages([]);
+    setInput("");
+    setIsLoading(false);
+    setIsSlowConnection(false);
     setTimeout(() => {
       contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
@@ -75,11 +83,15 @@ export default function ChildSafety() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
+    // Detect language of user input
+    const inputLanguage = detectLanguage(text);
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
       content: text.trim(),
       timestamp: new Date(),
+      language: inputLanguage,
     };
 
     if (isOffTopicRequest(text)) {
@@ -88,6 +100,7 @@ export default function ChildSafety() {
         role: "assistant",
         content: OFF_TOPIC_REFUSAL_MESSAGE,
         timestamp: new Date(),
+        language: inputLanguage,
       };
 
       setMessages((prev) => [...prev, userMessage, assistantReply]);
@@ -136,6 +149,7 @@ export default function ChildSafety() {
                 role: "assistant" as const,
                 content: fullContent,
                 timestamp: new Date(),
+                language: inputLanguage,
               },
             ];
           });
@@ -144,9 +158,11 @@ export default function ChildSafety() {
         onComplete: () => {
           setIsLoading(false);
           setIsSlowConnection(false);
+          // Format response based on detected language
+          const formattedContent = formatResponseByLanguage(fullContent, inputLanguage);
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId ? { ...m, content: fullContent } : m
+              m.id === assistantId ? { ...m, content: formattedContent, language: inputLanguage } : m
             )
           );
         },
@@ -161,6 +177,7 @@ export default function ChildSafety() {
                     content: error.message.includes("timed out")
                       ? error.message
                       : "I apologize, but I'm having trouble connecting right now. Please try again. If you're in immediate danger, please call 15 (Police) or 1121 (Child Protection).",
+                    language: inputLanguage,
                   }
                 : m
             )
@@ -653,9 +670,9 @@ function InlineChat({
                 }`}
               >
                 {msg.role === "assistant" ? (
-                  <MarkdownRenderer content={msg.content} />
+                  <MarkdownRenderer content={msg.content} language={msg.language || "english"} />
                 ) : (
-                  <p>{msg.content}</p>
+                  <p className={msg.language === "urdu" ? "text-right" : "text-left"}>{msg.content}</p>
                 )}
               </div>
               {msg.role === "user" && (
@@ -679,7 +696,8 @@ function InlineChat({
                 </div>
                 {isSlowConnection && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    Waking up the server — this can take up to a minute on first use.
+                     Please wait a moment — since this is your first visit, we’re getting the platform ready for you.
+
                   </p>
                 )}
               </div>
