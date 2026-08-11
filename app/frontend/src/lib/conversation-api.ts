@@ -3,6 +3,7 @@
  */
 
 import { useAuth } from "@/contexts/AuthContext";
+import { getAPIEndpoint } from "./api-config";
 
 export interface ConversationData {
   id: string;
@@ -32,7 +33,9 @@ export interface ConversationWithMessages {
 }
 
 class ConversationAPI {
-  private baseURL = "/api/v1/auth/v2";
+  private getBaseURL() {
+    return getAPIEndpoint("/api/v1/auth/v2");
+  }
 
   private getAuthHeader(token: string | null): HeadersInit {
     return {
@@ -50,7 +53,7 @@ class ConversationAPI {
     offset: number = 0
   ): Promise<{ conversations: ConversationData[]; total_count: number }> {
     const response = await fetch(
-      `${this.baseURL}/conversations?limit=${limit}&offset=${offset}`,
+      `${this.getBaseURL()}/conversations?limit=${limit}&offset=${offset}`,
       {
         method: "GET",
         headers: this.getAuthHeader(token),
@@ -76,7 +79,7 @@ class ConversationAPI {
     title: string | null = null,
     crime_type: string | null = null
   ): Promise<{ id: string; title: string | null; crime_type: string | null }> {
-    const response = await fetch(`${this.baseURL}/conversations`, {
+    const response = await fetch(`${this.getBaseURL()}/conversations`, {
       method: "POST",
       headers: this.getAuthHeader(token),
       body: JSON.stringify({ title, crime_type }),
@@ -98,7 +101,7 @@ class ConversationAPI {
     conversationId: string
   ): Promise<ConversationWithMessages> {
     const response = await fetch(
-      `${this.baseURL}/conversations/${conversationId}`,
+      `${this.getBaseURL()}/conversations/${conversationId}`,
       {
         method: "GET",
         headers: this.getAuthHeader(token),
@@ -127,7 +130,7 @@ class ConversationAPI {
     crime_type?: string
   ): Promise<{ id: string; role: string; content: string }> {
     const response = await fetch(
-      `${this.baseURL}/conversations/${conversationId}/messages`,
+      `${this.getBaseURL()}/conversations/${conversationId}/messages`,
       {
         method: "POST",
         headers: this.getAuthHeader(token),
@@ -156,7 +159,7 @@ class ConversationAPI {
     conversationId: string
   ): Promise<void> {
     const response = await fetch(
-      `${this.baseURL}/conversations/${conversationId}`,
+      `${this.getBaseURL()}/conversations/${conversationId}`,
       {
         method: "DELETE",
         headers: this.getAuthHeader(token),

@@ -3,6 +3,7 @@
  */
 
 import { useAuth } from "@/contexts/AuthContext";
+import { getAPIEndpoint } from "@/lib/api-config";
 import { useEffect, useState } from "react";
 
 export type Language = "english" | "urdu";
@@ -34,7 +35,7 @@ export function useLanguage() {
       setError(null);
 
       // Save to backend
-      const response = await fetch("/api/v1/users/language", {
+      const response = await fetch(getAPIEndpoint("/api/v1/users/language"), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

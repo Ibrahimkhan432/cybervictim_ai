@@ -6,6 +6,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { authApi } from '../lib/auth';
+import { getAPIEndpoint } from '../lib/api-config';
 
 interface User {
   id: string;
@@ -125,7 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const emailLogin = async (email: string, password: string) => {
     try {
       setError(null);
-      const response = await fetch('/api/v1/auth/login', {
+      const response = await fetch(getAPIEndpoint('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -161,7 +162,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ) => {
     try {
       setError(null);
-      const response = await fetch('/api/v1/auth/signup', {
+      const response = await fetch(getAPIEndpoint('/api/v1/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
