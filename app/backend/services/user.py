@@ -40,3 +40,22 @@ class UserService:
             logger.debug(f"[DB_OP] User profile update completed in {time.time() - start_time_update:.4f}s")
 
         return user
+
+    @staticmethod
+    async def update_language_preference(db: AsyncSession, user_id: str, language_preference: str) -> Optional[User]:
+        """Update user language preference."""
+        start_time = time.time()
+        logger.debug(f"[DB_OP] Starting update_language_preference - user_id: {user_id}, language: {language_preference}")
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        logger.debug(f"[DB_OP] User lookup completed in {time.time() - start_time:.4f}s - found: {user is not None}")
+
+        if user:
+            start_time_update = time.time()
+            logger.debug("[DB_OP] Starting language preference update")
+            user.language_preference = language_preference
+            await db.commit()
+            await db.refresh(user)
+            logger.debug(f"[DB_OP] Language preference update completed in {time.time() - start_time_update:.4f}s")
+
+        return user

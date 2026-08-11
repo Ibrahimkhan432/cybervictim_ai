@@ -1,5 +1,5 @@
 from models.base import Base
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String, Boolean
 from sqlalchemy.sql import func
 
 
@@ -7,11 +7,15 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String(255), primary_key=True, index=True)  # Use platform sub as primary key
-    email = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, unique=True, index=True)
     name = Column(String(255), nullable=True)
     role = Column(String(50), default="user", nullable=False)  # user/admin
+    password_hash = Column(String(255), nullable=True)  # For email/password auth
+    is_active = Column(Boolean, default=True)
+    language_preference = Column(String(10), default="english")  # urdu or english
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class OIDCState(Base):

@@ -317,5 +317,298 @@ async def get_current_user_info(current_user: UserResponse = Depends(get_current
 @router.get("/logout")
 async def logout():
     """Logout user."""
+    return {"message": "Logout successful"}
+
+
+# ============================================================================
+# PHASE 1: EMAIL/PASSWORD AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+
+@router.post("/signup", response_model=dict)
+async def signup(
+    request_data: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a new user with email and password"""
+    try:
+        from schemas.auth import UserCreateRequest
+        from services.auth_service import AuthService as NewAuthService
+
+        # Validate request
+        user_request = UserCreateRequest(
+            email=request_data.get("email"),
+            name=request_data.get("name"),
+            password=request_data.get("password"),
+            language_preference=request_data.get("language_preference", "english"),
+        )
+
+        # Register user
+        user, access_token, expires_in = await NewAuthService.register_user(db, user_request)
+
+        return {
+            "success": True,
+            "message": "Signup successful",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "language_preference": user.language_preference,
+            },
+            "token": {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": expires_in,
+            },
+        }
+
+    except ValueError as e:
+        logger.warning(f"Signup validation error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Signup error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Signup failed",
+        )
+
+
+@router.post("/login", response_model=dict)
+async def login(
+    request_data: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Login user with email and password"""
+    try:
+        from schemas.auth import UserLoginRequest
+        from services.auth_service import AuthService as NewAuthService
+
+        # Validate request
+        login_request = UserLoginRequest(
+            email=request_data.get("email"),
+            password=request_data.get("password"),
+        )
+
+        # Login user
+        user, access_token, expires_in = await NewAuthService.login_user(db, login_request)
+
+        return {
+            "success": True,
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "language_preference": user.language_preference,
+            },
+            "token": {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": expires_in,
+            },
+        }
+
+    except ValueError as e:
+        logger.warning(f"Login error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed",
+        )
+
+
+@router.post("/v2/conversations", response_model=dict)
+async def create_conversation(
+    request_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Create a new conversation for the user"""
+    try:
+        from services.conversation_service import ConversationService
+
+        conversation = await ConversationService.create_conversation(
+            db=db,
+            user_id=current_user.id,
+            title=request_data.get("title"),
+            crime_type=request_data.get("crime_type"),
+        )
+
+        return {
+            "success": True,
+            "conversation": {
+                "id": conversation.id,
+                "title": conversation.title,
+                "crime_type": conversation.crime_type,
+                "created_at": conversation.created_at.isoformat(),
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating conversation: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create conversation",
+        )
+
+
+@router.get("/v2/conversations", response_model=dict)
+async def list_conversations(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List user's conversations"""
+    try:
+        from services.conversation_service import ConversationService
+
+        conversations, total_count = await ConversationService.list_conversations(
+            db=db,
+            user_id=current_user.id,
+            limit=limit,
+            offset=offset,
+        )
+
+        return {
+            "success": True,
+            "total_count": total_count,
+            "conversations": [
+                {
+                    "id": conv.id,
+                    "title": conv.title,
+                    "crime_type": conv.crime_type,
+                    "is_favorited": conv.is_favorited,
+                    "created_at": conv.created_at.isoformat(),
+                    "updated_at": conv.updated_at.isoformat(),
+                }
+                for conv in conversations
+            ],
+        }
+
+    except Exception as e:
+        logger.error(f"Error listing conversations: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list conversations",
+        )
+
+
+@router.post("/v2/conversations/{conversation_id}/messages", response_model=dict)
+async def save_message(
+    conversation_id: str,
+    request_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Save a message to a conversation"""
+    try:
+        from services.conversation_service import ConversationService
+
+        message = await ConversationService.save_message(
+            db=db,
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+            role=request_data.get("role"),
+            content=request_data.get("content"),
+            language=request_data.get("language", "english"),
+            crime_type=request_data.get("crime_type"),
+        )
+
+        return {
+            "success": True,
+            "message": {
+                "id": message.id,
+                "role": message.role,
+                "content": message.content,
+                "created_at": message.created_at.isoformat(),
+            },
+        }
+
+    except ValueError as e:
+        logger.warning(f"Message save validation error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error saving message: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save message",
+        )
+
+
+@router.get("/v2/conversations/{conversation_id}", response_model=dict)
+async def get_conversation(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get a full conversation with all messages"""
+    try:
+        from services.conversation_service import ConversationService
+
+        result = await ConversationService.get_conversation_with_messages(
+            db=db,
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+        )
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found",
+            )
+
+        return {
+            "success": True,
+            "conversation": result,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving conversation: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve conversation",
+        )
+
+
+@router.delete("/v2/conversations/{conversation_id}", response_model=dict)
+async def delete_conversation(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Delete a conversation"""
+    try:
+        from services.conversation_service import ConversationService
+
+        success = await ConversationService.delete_conversation(
+            db=db,
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found",
+            )
+
+        return {
+            "success": True,
+            "message": "Conversation deleted",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting conversation: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete conversation",
+        )
     logout_url = build_logout_url()
     return {"redirect_url": logout_url}

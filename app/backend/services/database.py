@@ -5,6 +5,15 @@ import time
 from core.database import db_manager
 from sqlalchemy import text
 
+# Import all models to register them with Base.metadata
+# This ensures they're created when create_tables() is called
+# fmt: off
+from models.auth import User, OIDCState
+from models.conversations import Conversations
+from models.messages import Messages
+# Agent results models imported separately (Phase 2)
+# fmt: on
+
 logger = logging.getLogger(__name__)
 
 
