@@ -55,7 +55,7 @@ class ChatMessage(Base):
     Linked to conversations for organization
     """
 
-    __tablename__ = "chat_messages"
+    __tablename__ = "messages"
 
     id = Column(String(255), primary_key=True, index=True)
     conversation_id = Column(String(255), index=True, nullable=False)
