@@ -57,6 +57,7 @@ export default function ChatHistory({
       if (!response.ok) throw new Error("Failed to load conversations");
 
       const data = await response.json();
+      console.log("Fetched conversations:", data.conversations);
       setConversations(data.conversations || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading conversations");
