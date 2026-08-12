@@ -129,8 +129,8 @@ def include_routers_from_package(app: FastAPI, package_name: str = "routers") ->
             logger.warning("Failed to import module '%s': %s", module_name, exc)
             continue
 
-        # Check for router variable names: router and admin_router
-        for attr_name in ("router", "admin_router"):
+        # Check for router variable names: router, admin_router, and public_router
+        for attr_name in ("router", "admin_router", "public_router"):
             if not hasattr(module, attr_name):
                 continue
 

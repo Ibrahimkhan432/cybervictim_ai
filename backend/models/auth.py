@@ -7,9 +7,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String(255), primary_key=True, index=True)  # Use platform sub as primary key
-    email = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
     name = Column(String(255), nullable=True)
     role = Column(String(50), default="user", nullable=False)  # user/admin
+    # Nullable so OIDC-provisioned users (no password) still fit.
+    password_hash = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
 

@@ -11,6 +11,7 @@ import {
   Settings,
   ChevronDown,
   Loader,
+  BarChart3,
 } from "lucide-react";
 
 export default function UserMenu() {

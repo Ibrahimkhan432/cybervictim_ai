@@ -46,62 +46,38 @@ class DatabaseManager:
         return url
 
     def _normalize_async_database_url(self, raw_url: str) -> str:
-        """Ensure the database URL uses an async driver compatible with SQLAlchemy asyncio.
+        """Ensure the database URL uses asyncpg. Postgres is the ONLY supported backend.
 
-        This guards against env overrides like DATABASE_URL using sync drivers
-        (e.g., sqlite:/// or postgresql://), which would otherwise load 'pysqlite' or
-        other sync drivers and break async engine initialization.
+        Rewrites ``postgresql://`` and ``postgres://`` to ``postgresql+asyncpg://``
+        and strips query params incompatible with asyncpg (e.g. ``sslmode``,
+        ``channel_binding`` — Neon adds these by default).
         """
         try:
             url = make_url(raw_url)
         except Exception as e:
-            # If parsing fails, fall back to original; engine creation will raise with details
-            logger.error(f"Failed to parse database URL: {e}")
-            return raw_url
+            logger.error(f"Failed to parse DATABASE_URL: {e}")
+            raise ValueError(
+                "DATABASE_URL is not a valid URL. Expected a Postgres URL like "
+                "postgresql://user:pass@host/db"
+            ) from e
 
         drivername = url.drivername or ""
 
-        # Sanitize query params that are incompatible with asyncpg
-        if "postgresql" in drivername or "postgres" in drivername:
-            url = self._sanitize_query_params(url)
+        if "postgresql" not in drivername and "postgres" not in drivername:
+            raise ValueError(
+                f"Unsupported DATABASE_URL driver '{drivername}'. This app only "
+                "supports Postgres (postgresql:// or postgresql+asyncpg://)."
+            )
 
-        # Already async drivers
-        if "+aiosqlite" in drivername or "+asyncpg" in drivername or "+aiomysql" in drivername:
-            normalized = url.render_as_string(hide_password=False)
-            self._check_db_exist(normalized)
-            return normalized
+        # Strip asyncpg-incompatible query params
+        url = self._sanitize_query_params(url)
 
-        # Map common sync schemes to async equivalents
-        if drivername == "sqlite":
-            url = url.set(drivername="sqlite+aiosqlite")
-            self._check_db_exist(raw_url)
-        elif drivername in ("postgresql", "postgres"):
+        # Force the asyncpg driver
+        if "+asyncpg" not in drivername:
             url = url.set(drivername="postgresql+asyncpg")
-        elif drivername in ("mysql",):
-            url = url.set(drivername="mysql+aiomysql")
-        elif drivername in ("mariadb",):
-            url = url.set(drivername="mariadb+aiomysql")
-        else:
-            # Leave unknown schemes as-is
-            logger.warning(f"Unknown database driver: {drivername}")
-            return raw_url
+            logger.info("Rewrote DATABASE_URL to use postgresql+asyncpg driver")
 
-        normalized = url.render_as_string(hide_password=False)
-        if normalized != raw_url:
-            logger.warning("Adjusted database URL driver for async compatibility")
-        return normalized
-
-    @staticmethod
-    def _check_db_exist(raw_url: str) -> bool:
-        if "sqlite" not in raw_url:
-            return True
-        filename = raw_url.split(":///", 1)[1]
-        found = Path(filename).exists()
-        if found:
-            logger.debug(f"Database exists:{filename}")
-        else:
-            logger.error(f"Database not found:{filename}")
-        return found
+        return url.render_as_string(hide_password=False)
 
     async def init_db(self):
         """Initialize database connection with thread safety"""
@@ -121,13 +97,18 @@ class DatabaseManager:
             database_url = self._normalize_async_database_url(settings.database_url)
 
             logger.info("Creating async database engine...")
-            # Configure engine based on environment (Lambda vs non-Lambda)
-            engine_kwargs = {
-    "echo": settings.debug,
-    "connect_args": {
-        "ssl": "require"
-    }
-}
+            # Postgres-only: asyncpg + TLS (required by Neon and most managed providers).
+            # statement_cache_size=0 + prepared_statement_cache_size=0 is required for
+            # PgBouncer / Neon pooler compatibility — otherwise you get
+            # InvalidCachedStatementError after any schema change or pooler rotation.
+            engine_kwargs: dict = {
+                "echo": settings.debug,
+                "connect_args": {
+                    "ssl": "require",
+                    "statement_cache_size": 0,
+                    "prepared_statement_cache_size": 0,
+                },
+            }
 
             # Check if we're in a Lambda environment
             is_lambda = bool(

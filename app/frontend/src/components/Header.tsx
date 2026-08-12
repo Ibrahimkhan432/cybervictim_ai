@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Shield, Menu, X, MessageSquare, Baby } from "lucide-react";
+import { Shield, Menu, X, MessageSquare, Baby, BarChart3 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const navLinks = [
   { to: "/", label: "Home", icon: Shield },
   { to: "/chat", label: "Get Help Now", icon: MessageSquare },
   { to: "/child-safety", label: "Child Safety", icon: Baby },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 export default function Header() {

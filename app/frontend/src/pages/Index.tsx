@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CRIME_TYPES, QUICK_TOPICS } from "@/lib/knowledge-base";
 import Header from "@/components/Header";
+import AnalyticsSection from "@/components/AnalyticsSection";
 
 const features = [
   {
@@ -324,6 +325,9 @@ export default function Index() {
           </Link>
         </div>
       </section>
+
+      {/* Analytics Section */}
+      <AnalyticsSection />
 
       {/* Footer */}
       <footer className="border-t border-border/40 py-8">

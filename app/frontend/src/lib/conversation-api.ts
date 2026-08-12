@@ -34,7 +34,7 @@ export interface ConversationWithMessages {
 
 class ConversationAPI {
   private getBaseURL() {
-    return getAPIEndpoint("/api/v1/auth/v2");
+    return getAPIEndpoint("/api/v1/entities");
   }
 
   private getAuthHeader(token: string | null): HeadersInit {

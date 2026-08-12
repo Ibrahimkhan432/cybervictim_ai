@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAPIEndpoint } from "@/lib/api-config";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,15 +51,15 @@ export default function ChatHistory({
     try {
       setLoading(true);
       setError("");
-      const response = await fetch("/api/v1/auth/v2/conversations", {
+      const response = await fetch(getAPIEndpoint("/api/v1/entities/conversations"), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) throw new Error("Failed to load conversations");
+      if (!response.ok) throw new Error(" empty conversations history");
 
       const data = await response.json();
-      console.log("Fetched conversations:", data.conversations);
-      setConversations(data.conversations || []);
+      // Backend returns { items, total, skip, limit }
+      setConversations(data.items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading conversations");
     } finally {
@@ -76,7 +77,7 @@ export default function ChatHistory({
     if (!confirm("Delete this conversation? This action cannot be undone.")) return;
 
     try {
-      const response = await fetch(`/api/v1/auth/v2/conversations/${conversationId}`, {
+      const response = await fetch(getAPIEndpoint(`/api/v1/entities/conversations/${conversationId}`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

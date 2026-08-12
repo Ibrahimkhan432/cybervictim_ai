@@ -10,6 +10,7 @@ import Chat from './pages/Chat';
 import ChildSafety from './pages/ChildSafety';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import Analytics from './pages/Analytics';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
 import Login from './pages/Login';
@@ -56,6 +57,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route path="/analytics" element={<Analytics />} />
     {/* <Route path="/blog/*" element={<BlogRoutes />} /> */}
     <Route path="/auth/callback" element={<AuthCallback />} />
     <Route path="/auth/error" element={<AuthError />} />

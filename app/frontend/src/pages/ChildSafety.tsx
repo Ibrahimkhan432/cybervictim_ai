@@ -372,7 +372,7 @@ export default function ChildSafety() {
                 <Phone className="h-6 w-6 text-cyan-400" />
                 Where to Report
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="border-cyan-500/20 bg-cyan-500/5">
                   <CardContent className="p-5">
                     <p className="font-semibold text-cyan-400 mb-2">
@@ -391,6 +391,31 @@ export default function ChildSafety() {
                       className="inline-flex items-center gap-1 text-sm text-cyan-400 hover:text-cyan-300"
                     >
                       File Online <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-indigo-500/20 bg-indigo-500/5">
+                  <CardContent className="p-5">
+                    <p className="font-semibold text-indigo-400 mb-2">
+                      {AUTHORITY_REFERRALS.nccia.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      National Cyber Crime Investigation Agency
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Helpline:{" "}
+                      <span className="font-mono text-foreground font-bold">
+                        {AUTHORITY_REFERRALS.nccia.helpline}
+                      </span>
+                    </p>
+                    <a
+                      href={AUTHORITY_REFERRALS.nccia.onlinePortal}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-indigo-400 hover:text-indigo-300"
+                    >
+                      NCCIA Complaint Portal <ExternalLink className="h-3 w-3" />
                     </a>
                   </CardContent>
                 </Card>
@@ -696,7 +721,7 @@ function InlineChat({
                 </div>
                 {isSlowConnection && (
                   <p className="text-xs text-muted-foreground mt-2">
-                     Please wait a moment — since this is your first visit, we’re getting the platform ready for you.
+                     Please wait a moment  since this is your first visit, we’re getting the platform ready for you.
 
                   </p>
                 )}

@@ -1,5 +1,7 @@
 import logging
 import os
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlencode
 
@@ -20,15 +22,57 @@ from dependencies.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from models.auth import User
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr, Field
 from schemas.auth import (
     PlatformTokenExchangeRequest,
     TokenExchangeResponse,
     UserResponse,
 )
 from services.auth import AuthService
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
+
+# --- Password hashing (bcrypt via passlib) --------------------------------
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _hash_password(password: str) -> str:
+    return _pwd_context.hash(password)
+
+
+def _verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return _pwd_context.verify(password, password_hash)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+# --- Request/response schemas for email+password auth ---------------------
+class SignupRequest(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    password: str = Field(min_length=6, max_length=128)
+    language_preference: Optional[str] = None  # accepted but not persisted yet
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenPayload(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_at: int  # unix timestamp
+
+
+class AuthEnvelope(BaseModel):
+    token: TokenPayload
+    user: UserResponse
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,6 +117,67 @@ def derive_name_from_email(email: str) -> str:
     return email.split("@", 1)[0] if email else ""
 
 
+# --- Email + password auth (self-contained; no OIDC provider needed) -----
+async def _issue_envelope(auth_service: AuthService, user: User) -> AuthEnvelope:
+    token, expires_at, _ = await auth_service.issue_app_token(user=user)
+    return AuthEnvelope(
+        token=TokenPayload(
+            access_token=token,
+            token_type="Bearer",
+            expires_at=int(expires_at.timestamp()),
+        ),
+        user=UserResponse.model_validate(user),
+    )
+
+
+@router.post("/signup", response_model=AuthEnvelope, status_code=status.HTTP_201_CREATED)
+async def signup(payload: SignupRequest, db: AsyncSession = Depends(get_db)):
+    """Create a new user with email + password, return JWT + user."""
+    email = payload.email.lower().strip()
+
+    existing = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=email,
+        name=(payload.name or derive_name_from_email(email)),
+        role="user",
+        password_hash=_hash_password(payload.password),
+        last_login=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return await _issue_envelope(AuthService(db), user)
+
+
+@router.post("/login", response_model=AuthEnvelope)
+async def login_email_password(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """Authenticate with email + password, return JWT + user."""
+    email = payload.email.lower().strip()
+
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if user is None or not user.password_hash or not _verify_password(payload.password, user.password_hash):
+        # Same message for both cases so we don't leak which emails exist.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        )
+
+    user.last_login = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(user)
+
+    return await _issue_envelope(AuthService(db), user)
+
+
+# --- OIDC flow (kept alongside; GET /login is OIDC, POST /login is email) -
 @router.get("/login")
 async def login(request: Request, db: AsyncSession = Depends(get_db)):
     """Start OIDC login flow with PKCE."""

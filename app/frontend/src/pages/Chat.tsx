@@ -965,6 +965,36 @@ export default function Chat() {
 
                     </div>
 
+                    {/* NCCIA */}
+                    <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/20">
+
+                      <p className="text-sm font-medium text-indigo-400">
+                        {AUTHORITY_REFERRALS.nccia.name}
+                      </p>
+
+                      <p className="text-xs text-muted-foreground mt-1">
+                        National Cyber Crime Investigation Agency
+                      </p>
+
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Helpline:{" "}
+                        <span className="font-mono text-foreground">
+                          {AUTHORITY_REFERRALS.nccia.helpline}
+                        </span>
+                      </p>
+
+                      <a
+                        href={AUTHORITY_REFERRALS.nccia.onlinePortal}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 mt-1"
+                      >
+                        NCCIA Complaint Portal
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+
+                    </div>
+
                     {/* DRF */}
                     <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
 

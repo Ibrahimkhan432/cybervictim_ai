@@ -141,6 +141,14 @@ export const AUTHORITY_REFERRALS = {
     email: "childprotection@sos.org.pk",
     website: "https://www.soschildrensvillages.ca",
   },
+  nccia: {
+    name: "NCCIA",
+    description:
+      "National Cyber Crime Investigation Agency — investigates cybercrime under PECA",
+    helpline: "1799",
+    website: "https://nccia.gov.pk",
+    onlinePortal: "https://complaint.nccia.gov.pk",
+  },
   peca: {
     name: "PECA 2016",
     description: "Prevention of Electronic Crimes Act 2016 - Pakistan's cybercrime law",
