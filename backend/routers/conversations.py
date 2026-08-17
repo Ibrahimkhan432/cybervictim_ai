@@ -23,8 +23,8 @@ router = APIRouter(prefix="/api/v1/entities/conversations", tags=["conversations
 class ConversationsData(BaseModel):
     """Entity data schema (for create/update)"""
     title: str
-    crime_type: str = None
-    is_child_safety: bool = None
+    crime_type: Optional[str] = None
+    is_child_safety: Optional[bool] = None
 
 
 class ConversationsUpdateData(BaseModel):

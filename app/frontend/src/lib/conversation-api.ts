@@ -65,9 +65,12 @@ class ConversationAPI {
     }
 
     const data = await response.json();
+    const items = data?.items ?? data?.conversations ?? [];
+    const total = data?.total ?? data?.total_count ?? 0;
+
     return {
-      conversations: data.conversations || [],
-      total_count: data.total_count || 0,
+      conversations: Array.isArray(items) ? items : [],
+      total_count: Number(total) || 0,
     };
   }
 
@@ -90,7 +93,7 @@ class ConversationAPI {
     }
 
     const data = await response.json();
-    return data.conversation;
+    return data?.conversation ?? data;
   }
 
   /**
@@ -115,7 +118,7 @@ class ConversationAPI {
     }
 
     const data = await response.json();
-    return data.conversation;
+    return data?.conversation ?? data;
   }
 
   /**
@@ -148,7 +151,7 @@ class ConversationAPI {
     }
 
     const data = await response.json();
-    return data.message;
+    return data?.message ?? data;
   }
 
   /**

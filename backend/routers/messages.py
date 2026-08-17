@@ -25,7 +25,7 @@ class MessagesData(BaseModel):
     conversation_id: int
     role: str
     content: str
-    crime_type: str = None
+    crime_type: Optional[str] = None
 
 
 class MessagesUpdateData(BaseModel):

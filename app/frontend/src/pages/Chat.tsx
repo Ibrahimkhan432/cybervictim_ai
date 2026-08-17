@@ -142,16 +142,27 @@ export default function Chat() {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [isSavingMessage, setIsSavingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, []);
 
+  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
+
+  // Auto-scroll when content is streaming
+  useEffect(() => {
+    if (isLoading && messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [isLoading, messages, scrollToBottom]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -232,26 +243,30 @@ export default function Chat() {
           );
         }
         setCurrentConversationId(conversationId);
+        
+        // Scroll to bottom after loading
+        setTimeout(scrollToBottom, 100);
       } catch (error) {
         console.error("Error loading conversation:", error);
       } finally {
         setIsLoadingConversation(false);
       }
     },
-    [conversationAPI]
+    [conversationAPI, scrollToBottom]
   );
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, crimeTypeOverride?: CrimeType) => {
     if (!text.trim() || isLoading) return;
 
     // Detect language of user input
     const inputLanguage = detectLanguage(text);
+    const activeCrimeType = crimeTypeOverride ?? detectedCrime;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: text.trim(),
-      crimeType: detectedCrime,
+      crimeType: activeCrimeType,
       timestamp: new Date(),
       language: inputLanguage,
     };
@@ -266,12 +281,14 @@ export default function Chat() {
       };
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput("");
+      setTimeout(scrollToBottom, 100);
       return;
     }
 
     const detected = detectCrimeType(text);
-    if (detected && !detectedCrime) {
-      setDetectedCrime(detected);
+    const resolvedCrime = crimeTypeOverride ?? detected ?? detectedCrime;
+    if (resolvedCrime && !detectedCrime) {
+      setDetectedCrime(resolvedCrime);
     }
 
     setMessages((prev) => [...prev, userMessage]);
@@ -282,7 +299,7 @@ export default function Chat() {
     let conversationId = currentConversationId;
     if (!conversationId) {
       const title = text.substring(0, 50); // Use first 50 chars as title
-      const crimeType = detected || detectedCrime;
+      const crimeType = resolvedCrime;
       conversationId = await createNewConversation(title, crimeType || null);
       if (conversationId) {
         setCurrentConversationId(conversationId);
@@ -300,22 +317,36 @@ export default function Chat() {
         "user",
         text.trim(),
         inputLanguage,
-        detected || detectedCrime
+        resolvedCrime
       );
     }
 
-    const isChildSafety = detectedCrime === "child_safety" || detected === "child_safety";
+    const isChildSafety =
+      resolvedCrime === "child_safety" ||
+      detectedCrime === "child_safety" ||
+      detected === "child_safety";
     const systemPrompt = isChildSafety ? CHILD_SAFETY_PROMPT : SYSTEM_PROMPT;
 
+    const historyMessages = messages.slice(-MAX_HISTORY_MESSAGES);
     const aiMessages = [
       { role: "system" as const, content: systemPrompt },
-      ...messages
-        .slice(-MAX_HISTORY_MESSAGES)
-        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ...historyMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
       { role: "user" as const, content: text.trim() },
     ];
 
     const assistantId = (Date.now() + 1).toString();
+    const assistantPlaceholder: Message = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      language: inputLanguage,
+    };
+    setMessages((prev) => [...prev, assistantPlaceholder]);
+
     let fullContent = "";
     setIsSlowConnection(false);
 
@@ -328,42 +359,40 @@ export default function Chat() {
         onChunk: (chunk) => {
           setIsSlowConnection(false);
           fullContent += chunk.content || "";
-          setMessages((prev) => {
-            const existing = prev.find((m) => m.id === assistantId);
-            if (existing) {
-              return prev.map((m) =>
-                m.id === assistantId ? { ...m, content: fullContent } : m
-              );
-            }
-            return [
-              ...prev,
-              {
-                id: assistantId,
-                role: "assistant" as const,
-                content: fullContent,
-                timestamp: new Date(),
-                language: inputLanguage,
-              },
-            ];
-          });
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: fullContent, language: inputLanguage }
+                : m
+            )
+          );
         },
-        onComplete: async () => {
+        onComplete: async (result) => {
           setIsLoading(false);
           setIsSlowConnection(false);
-          const extracted = extractCrimeTypeFromResponse(fullContent);
+          const finalContent = result?.content || fullContent;
+          const extracted = extractCrimeTypeFromResponse(finalContent);
           if (extracted && !detectedCrime) {
             setDetectedCrime(extracted);
           }
-          // Format response based on detected language
-          const formattedContent = formatResponseByLanguage(fullContent, inputLanguage);
+          const formattedContent = formatResponseByLanguage(
+            finalContent,
+            inputLanguage
+          );
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId ? { ...m, content: formattedContent, crimeType: extracted, language: inputLanguage } : m
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: formattedContent,
+                    crimeType: extracted,
+                    language: inputLanguage,
+                  }
+                : m
             )
           );
 
-          // Save AI response to backend
-          if (conversationId) {
+          if (conversationId && formattedContent.trim()) {
             await saveMessage(
               conversationId,
               "assistant",
@@ -372,6 +401,8 @@ export default function Chat() {
               extracted
             );
           }
+          
+          setTimeout(scrollToBottom, 100);
         },
         onError: (error) => {
           setIsLoading(false);
@@ -391,6 +422,7 @@ export default function Chat() {
                 : m
             )
           );
+          setTimeout(scrollToBottom, 100);
         },
       });
     } catch (error) {
@@ -407,7 +439,7 @@ export default function Chat() {
 
   const handleQuickTopic = (topic: (typeof QUICK_TOPICS)[0]) => {
     setDetectedCrime(topic.crimeType);
-    sendMessage(topic.label);
+    sendMessage(topic.label, topic.crimeType);
   };
 
   const resetChat = () => {
@@ -428,8 +460,8 @@ export default function Chat() {
     : undefined;
   const activePeca = detectedCrime ? PECA_SECTIONS[detectedCrime] : undefined;
 
-    return (
-    <div className="min-h-screen bg-background flex flex-col">
+  return (
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
@@ -452,8 +484,8 @@ export default function Chat() {
         <UserMenu />
       </div>
 
-      {/* Main Application Area */}
-      <div className="flex-1 min-h-0 flex flex-row max-w-full mx-auto w-full">
+      {/* Main Application Area - using flex-1 and overflow-hidden */}
+      <div className="flex-1 min-h-0 flex flex-row max-w-full mx-auto w-full overflow-hidden">
 
         {/* =========================
             LEFT SIDEBAR - CHAT HISTORY
@@ -479,11 +511,11 @@ export default function Chat() {
         )}
 
         {/* =========================
-            CENTER CHAT AREA
+            CENTER CHAT AREA - Flex Column with proper height management
         ========================== */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
-          {/* Chat Header */}
+          {/* Chat Header - Shrink */}
           {activeCrime && (
             <div className="shrink-0 border-b border-border/40 bg-muted/30 px-4 py-3">
               <div className="flex items-center justify-between">
@@ -518,11 +550,12 @@ export default function Chat() {
           )}
 
           {/* =========================
-              MESSAGES AREA
-              ONLY THIS AREA SCROLLS
+              MESSAGES AREA - Scrollable
           ========================== */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-4">
-
+          <div 
+            ref={messagesContainerRef}
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-4"
+          >
             {/* Loading Conversation */}
             {isLoadingConversation ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
@@ -619,127 +652,128 @@ export default function Chat() {
               /* =========================
                  CHAT MESSAGES
               ========================== */
-              messages.map((msg) => (
+              <>
+                {messages.map((msg) => (
 
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 ${
-                    msg.role === "user"
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
-
-                  {/* AI ICON */}
-                  {msg.role === "assistant" && (
-                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0 mt-1">
-                      <Bot className="h-4 w-4 text-white" />
-                    </div>
-                  )}
-
-                  {/* MESSAGE */}
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    key={msg.id}
+                    className={`flex gap-3 ${
                       msg.role === "user"
-                        ? "bg-cyan-500/10 border border-cyan-500/20 text-foreground"
-                        : "bg-card border border-border/50 text-foreground"
+                        ? "justify-end"
+                        : "justify-start"
                     }`}
                   >
 
-                    <div className="text-sm leading-relaxed prose-sm">
+                    {/* AI ICON */}
+                    {msg.role === "assistant" && (
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0 mt-1">
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+                    )}
 
-                      {msg.role === "assistant" ? (
-                        <MarkdownRenderer
-                          content={msg.content}
-                          language={msg.language || "english"}
-                        />
-                      ) : (
-                        <span
-                          className={`whitespace-pre-wrap block ${
-                            msg.language === "urdu"
-                              ? "text-right"
-                              : "text-left"
-                          }`}
-                        >
-                          {msg.content}
-                        </span>
+                    {/* MESSAGE */}
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        msg.role === "user"
+                          ? "bg-cyan-500/10 border border-cyan-500/20 text-foreground"
+                          : "bg-card border border-border/50 text-foreground"
+                      }`}
+                    >
+
+                      <div className="text-sm leading-relaxed prose-sm">
+
+                        {msg.role === "assistant" ? (
+                          <MarkdownRenderer
+                            content={msg.content}
+                            language={msg.language || "english"}
+                          />
+                        ) : (
+                          <span
+                            className={`whitespace-pre-wrap block ${
+                              msg.language === "urdu"
+                                ? "text-right"
+                                : "text-left"
+                            }`}
+                          >
+                            {msg.content}
+                          </span>
+                        )}
+
+                      </div>
+
+                      {/* Crime Type */}
+                      {msg.role === "assistant" && msg.crimeType && (
+                        <div className="mt-2 pt-2 border-t border-border/30">
+
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              CRIME_TYPES[msg.crimeType]?.borderColor
+                            } ${
+                              CRIME_TYPES[msg.crimeType]?.textColor
+                            }`}
+                          >
+                            {CRIME_TYPES[msg.crimeType]?.icon}{" "}
+                            {CRIME_TYPES[msg.crimeType]?.label}
+                          </Badge>
+
+                        </div>
                       )}
 
                     </div>
 
-                    {/* Crime Type */}
-                    {msg.role === "assistant" && msg.crimeType && (
-                      <div className="mt-2 pt-2 border-t border-border/30">
-
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            CRIME_TYPES[msg.crimeType]?.borderColor
-                          } ${
-                            CRIME_TYPES[msg.crimeType]?.textColor
-                          }`}
-                        >
-                          {CRIME_TYPES[msg.crimeType]?.icon}{" "}
-                          {CRIME_TYPES[msg.crimeType]?.label}
-                        </Badge>
-
+                    {/* USER ICON */}
+                    {msg.role === "user" && (
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-1">
+                        <User className="h-4 w-4 text-muted-foreground" />
                       </div>
                     )}
 
                   </div>
 
-                  {/* USER ICON */}
-                  {msg.role === "user" && (
-                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-1">
-                      <User className="h-4 w-4 text-muted-foreground" />
+                ))}
+
+                {/* =========================
+                    AI LOADING INDICATOR
+                ========================== */}
+                {isLoading &&
+                  messages[messages.length - 1]?.role === "user" && (
+
+                    <div className="flex gap-3 justify-start">
+
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0">
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+
+                      <div className="bg-card border border-border/50 rounded-2xl px-4 py-3">
+
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:0ms]" />
+                          <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
+                          <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
+                        </div>
+
+                        {isSlowConnection && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Please wait a moment — since this is your first visit,
+                            we're getting the platform ready for you.
+                          </p>
+                        )}
+
+                      </div>
+
                     </div>
                   )}
 
-                </div>
-
-              ))
+                {/* Auto Scroll Target */}
+                <div ref={messagesEndRef} />
+              </>
             )}
-
-            {/* =========================
-                AI LOADING INDICATOR
-            ========================== */}
-            {isLoading &&
-              messages[messages.length - 1]?.role === "user" && (
-
-                <div className="flex gap-3 justify-start">
-
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0">
-                    <Bot className="h-4 w-4 text-white" />
-                  </div>
-
-                  <div className="bg-card border border-border/50 rounded-2xl px-4 py-3">
-
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:0ms]" />
-                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
-                      <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
-                    </div>
-
-                    {isSlowConnection && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Please wait a moment — since this is your first visit,
-                        we’re getting the platform ready for you.
-                      </p>
-                    )}
-
-                  </div>
-
-                </div>
-              )}
-
-            {/* Auto Scroll Target */}
-            <div ref={messagesEndRef} />
 
           </div>
 
           {/* =========================
-              INPUT AREA
-              ALWAYS AT BOTTOM
+              INPUT AREA - Always at bottom, Shrink
           ========================== */}
           <div className="shrink-0 border-t border-border/40 bg-background/95 backdrop-blur-xl p-4">
 
@@ -780,7 +814,7 @@ export default function Chat() {
             RIGHT SIDEBAR
         ========================== */}
         {detectedCrime && (
-          <div className="w-full lg:w-80 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-border/40 bg-muted/20 overflow-y-auto">
+          <div className="hidden lg:block w-80 flex-shrink-0 border-l border-border/40 bg-muted/20 overflow-y-auto">
 
             <div className="p-4 space-y-4">
 
