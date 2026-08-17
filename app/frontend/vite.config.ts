@@ -2,12 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import fs from 'node:fs';
 import path from 'path';
-import { viteSourceLocator } from '@metagptx/vite-plugin-source-locator';
-import { atoms } from '@metagptx/web-sdk/plugins';
-import { vitePrerenderPlugin } from 'vite-prerender-plugin';
 import Sitemap from 'vite-plugin-sitemap';
-import { getBlogRoutes } from './prerender/blog-routes.js';
-import { getSitemapLastmod } from './prerender/blog-sitemap.js';
+
+// Remove unused imports:
+// - viteSourceLocator (atoms ai)
+// - atoms (atoms ai)
+// - vitePrerenderPlugin (unused)
+// - getBlogRoutes (unused)
+// - getSitemapLastmod (unused)
 
 function escapeHtmlAttr(str: string): string {
   return str
@@ -38,29 +40,21 @@ function ensureBuildOutDir() {
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
-  const blogPrerenderRoutes = command === 'build' ? getBlogRoutes() : [];
+  // Remove blog prerender routes - not needed
+  // const blogPrerenderRoutes = command === 'build' ? getBlogRoutes() : [];
 
   return {
     plugins: [
-      viteSourceLocator({
-        prefix: 'mgx', // Prefix used to identify source locations; do not change.
-      }),
       react(),
-      atoms(),
+      // Removed: viteSourceLocator, atoms, vitePrerenderPlugin
       ensureBuildOutDir(),
       Sitemap({
-        hostname: 'https://atoms.template.com',
-        lastmod: getSitemapLastmod(),
+        hostname: 'https://cybervictim-ai.vercel.app', 
         readable: true,
         generateRobotsTxt: true,
+        // Remove lastmod if you don't have blog posts
       }),
-      ...(blogPrerenderRoutes.length > 0
-        ? vitePrerenderPlugin({
-            renderTarget: '#root',
-            prerenderScript: path.resolve(__dirname, 'prerender/blog.js'),
-            additionalPrerenderRoutes: blogPrerenderRoutes,
-          })
-        : []),
+      // Removed blog prerender plugin
     ],
     resolve: {
       alias: {
@@ -68,7 +62,7 @@ export default defineConfig(({ command }) => {
       },
     },
     server: {
-      host: '0.0.0.0', // Listen on all network interfaces.
+      host: '0.0.0.0', 
       port: parseInt(process.env.VITE_PORT || '3000'),
       proxy: {
         '/api': {
@@ -79,10 +73,13 @@ export default defineConfig(({ command }) => {
       watch: { usePolling: true, interval: 600 },
     },
     build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      sourcemap: false, // Set to true for debugging
       rollupOptions: {
         output: {
           manualChunks: {
-            // Vendor chunks
+            // Vendor chunks - optimized for better performance
             'react-vendor': ['react', 'react-dom'],
             'router-vendor': ['react-router-dom'],
             'ui-vendor': [
@@ -128,6 +125,13 @@ export default defineConfig(({ command }) => {
         },
       },
       chunkSizeWarningLimit: 1000,
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
     },
   };
 });
