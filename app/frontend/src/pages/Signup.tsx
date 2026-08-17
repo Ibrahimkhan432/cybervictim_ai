@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Loader, CheckCircle } from "lucide-react";
+import { AlertCircle, Loader, CheckCircle, Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -16,6 +16,8 @@ export default function Signup() {
     confirmPassword: "",
     language: "english",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +45,11 @@ export default function Signup() {
     if (passwordStrength <= 2) return "bg-yellow-500";
     if (passwordStrength <= 3) return "bg-blue-500";
     return "bg-emerald-500";
+  };
+
+  const getPasswordStrengthText = () => {
+    const strengths = ["Very weak", "Weak", "Fair", "Good", "Strong", "Very strong"];
+    return strengths[passwordStrength] || "Very weak";
   };
 
   const validateForm = () => {
@@ -157,62 +164,115 @@ export default function Signup() {
                 />
               </div>
 
-              {/* Password */}
+              {/* Password with Toggle */}
               <div>
                 <label className="text-sm font-medium text-foreground block mb-1.5">
                   Password
                 </label>
-                <Input
-                  type="password"
-                  name="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  className="bg-muted/50 border-border/50"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    className="bg-muted/50 border-border/50 pr-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    disabled={isLoading}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                
+                {/* Password Strength Indicator */}
                 {formData.password && (
                   <div className="mt-2">
                     <div className="flex gap-1">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <div
                           key={i}
-                          className={`h-1 flex-1 rounded-full ${
+                          className={`h-1 flex-1 rounded-full transition-all duration-300 ${
                             i < passwordStrength ? getPasswordStrengthColor() : "bg-muted"
                           }`}
                         />
                       ))}
                     </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <p className="text-xs text-muted-foreground">
+                        Strength: <span className="font-medium">{getPasswordStrengthText()}</span>
+                      </p>
+                      {formData.password.length >= 8 && (
+                        <span className="text-xs text-emerald-400 flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Secure
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Password strength: {["Very weak", "Weak", "Fair", "Good", "Strong", "Very strong"][passwordStrength]}
+                      Min 6 characters • Use uppercase, numbers & symbols for strong password
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Confirm Password */}
+              {/* Confirm Password with Toggle */}
               <div>
                 <label className="text-sm font-medium text-foreground block mb-1.5">
                   Confirm Password
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <Input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     name="confirmPassword"
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     disabled={isLoading}
-                    className="bg-muted/50 border-border/50 flex-1"
+                    className="bg-muted/50 border-border/50 pr-12"
                     required
                   />
-                  {formData.password &&
-                    formData.confirmPassword &&
-                    formData.password === formData.confirmPassword && (
-                      <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    disabled={isLoading}
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
                     )}
+                  </button>
                 </div>
+                
+                {/* Password Match Indicator */}
+                {formData.confirmPassword && (
+                  <div className="mt-2">
+                    {formData.password === formData.confirmPassword ? (
+                      <p className="text-xs text-emerald-400 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Passwords match
+                      </p>
+                    ) : (
+                      <p className="text-xs text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Passwords do not match
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Language */}
@@ -225,7 +285,7 @@ export default function Signup() {
                   value={formData.language}
                   onChange={handleChange}
                   disabled={isLoading}
-                  className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-foreground focus:border-cyan-500/50 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-foreground focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
                 >
                   <option value="english">English</option>
                   <option value="urdu">اردو (Urdu)</option>
@@ -235,7 +295,13 @@ export default function Signup() {
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={isLoading || !formData.name || !formData.email || formData.password.length < 6}
+                disabled={
+                  isLoading || 
+                  !formData.name || 
+                  !formData.email || 
+                  formData.password.length < 6 ||
+                  formData.password !== formData.confirmPassword
+                }
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 h-11"
               >
                 {isLoading ? (
