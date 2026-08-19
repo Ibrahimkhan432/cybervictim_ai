@@ -535,7 +535,7 @@ export default function ChildSafety() {
                   <ol className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-start gap-2">
                       <span className="font-bold text-amber-400">1.</span>
-                      Don't panic — you're going to be okay
+                      Don't panic  you're going to be okay
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="font-bold text-amber-400">2.</span>
@@ -543,7 +543,7 @@ export default function ChildSafety() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="font-bold text-amber-400">3.</span>
-                      Don't delete any messages — they might be important evidence
+                      Don't delete any messages they might be important evidence
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="font-bold text-amber-400">4.</span>

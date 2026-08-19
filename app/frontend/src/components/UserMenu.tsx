@@ -134,7 +134,6 @@ export default function UserMenu() {
                   {isLanguageLoading && language === "urdu" ? (
                     <Loader className="h-3 w-3 inline mr-1 animate-spin" />
                   ) : null}
-                  اردو
                 </button>
               </div>
             </div>

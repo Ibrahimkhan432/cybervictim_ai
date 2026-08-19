@@ -49,7 +49,7 @@ const features = [
     icon: Clock,
     title: "24/7 Instant Guidance",
     description:
-      "Get help anytime, day or night. The AI responds immediately with clear step-by-step instructions for your exact situation.",
+      "Get help anytime, day or night. The AI responds immediately with clear step by step instructions for your exact situation.",
     accent: "from-cyan-500/20 to-cyan-500/5",
     iconAccent: "text-cyan-400",
     ring: "ring-cyan-500/20",
@@ -58,7 +58,7 @@ const features = [
     icon: Shield,
     title: "Automatic Classification",
     description:
-      "Describe what happened in plain words — the AI identifies the type of cybercrime and the relevant PECA sections.",
+      "Describe what happened in plain words  the AI identifies the type of cybercrime and the relevant PECA sections.",
     accent: "from-blue-500/20 to-blue-500/5",
     iconAccent: "text-blue-400",
     ring: "ring-blue-500/20",
@@ -67,7 +67,7 @@ const features = [
     icon: FileCheck,
     title: "Evidence Checklists",
     description:
-      "A clear checklist of exactly what to screenshot, save, and preserve — before you file a complaint.",
+      "A clear checklist of exactly what to screenshot, save, and preserve  before you file a complaint.",
     accent: "from-emerald-500/20 to-emerald-500/5",
     iconAccent: "text-emerald-400",
     ring: "ring-emerald-500/20",
@@ -76,7 +76,7 @@ const features = [
     icon: Heart,
     title: "Emotional First-Response",
     description:
-      "Detects distress and leads with empathy. Practical steps come after you're steady — because your well-being matters first.",
+      "Detects distress and leads with empathy. Practical steps come after you're steady  because your well-being matters first.",
     accent: "from-pink-500/20 to-pink-500/5",
     iconAccent: "text-pink-400",
     ring: "ring-pink-500/20",
@@ -94,7 +94,7 @@ const features = [
     icon: Phone,
     title: "Direct to Authorities",
     description:
-      "One-tap links to FIA, NCCIA, Digital Rights Foundation, and child-protection helplines — with the numbers you need.",
+      "One-tap links to FIA, NCCIA, Digital Rights Foundation, and child protection helplines  with the numbers you need.",
     accent: "from-indigo-500/20 to-indigo-500/5",
     iconAccent: "text-indigo-400",
     ring: "ring-indigo-500/20",
@@ -112,7 +112,7 @@ const steps = [
   {
     n: "01",
     title: "Describe what happened",
-    body: "Type in English or Urdu. No forms, no legal jargon — just tell the story in your own words.",
+    body: "Type in English or Urdu. No forms, no legal jargon  just tell the story in your own words.",
     icon: MessageSquare,
   },
   {
@@ -601,7 +601,7 @@ export default function Index() {
                     <p className="leading-relaxed text-foreground/90">
                       I'm here with you. First <span className="font-medium">do not pay</span>. Let's
                       preserve evidence, then file with the FIA Cyber Wing under{" "}
-                      <span className="font-medium text-cyan-500">PECA §21</span>.
+                      <span className="font-medium text-cyan-500">PECA 21</span>.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">

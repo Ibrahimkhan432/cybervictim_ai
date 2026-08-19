@@ -786,7 +786,7 @@ export default function Chat() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Describe your situation... (English or Urdu)"
+                placeholder="Describe your situation..."
                 disabled={isLoading}
                 className="flex-1 h-11 bg-muted/50 border-border/50 focus:border-cyan-500/50 focus:ring-cyan-500/20"
               />
