@@ -724,8 +724,7 @@ function InlineChat({
                 </div>
                 {isSlowConnection && (
                   <p className="text-xs text-muted-foreground mt-2">
-                     Please wait a moment  since this is your first visit, we’re getting the platform ready for you.
-
+                    This response will take a moment for the first request, so please wait for a moment.
                   </p>
                 )}
               </div>
