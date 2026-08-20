@@ -51,11 +51,7 @@ const AppRoutes = () => (
     />
     <Route
       path="/child-safety"
-      element={
-        <ProtectedRoute>
-          <ChildSafety />
-        </ProtectedRoute>
-      }
+      element={<ChildSafety />}
     />
     <Route path="/analytics" element={<Analytics />} />
     {/* <Route path="/blog/*" element={<BlogRoutes />} /> */}

@@ -5,6 +5,21 @@ export interface AiChatMessage {
   content: string;
 }
 
+export async function recordChildSafetyPrompt(prompt: string): Promise<void> {
+  const baseUrl = getAPIBaseURL().replace(/\/$/, "");
+
+  try {
+    await fetch(`${baseUrl}/api/v1/public/analytics/child-safety/prompt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+  } catch (error) {
+    // Analytics persistence must not prevent a child-safety response.
+    console.warn("Failed to record child-safety prompt", error);
+  }
+}
+
 interface StreamGenTxtParams {
   messages: AiChatMessage[];
   model?: string;

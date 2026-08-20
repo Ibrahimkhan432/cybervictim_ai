@@ -6,9 +6,10 @@ aggregate, non-personal counts used on the marketing/home page.
 """
 import logging
 from typing import List
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +35,10 @@ class PublicAnalyticsOverview(BaseModel):
     total_messages: int
     unique_content_types: int
     content_types: List[ContentTypeBreakdown]
+
+
+class ChildSafetyPrompt(BaseModel):
+    prompt: str = Field(min_length=1, max_length=10_000)
 
 
 @router.get("/overview", response_model=PublicAnalyticsOverview)
@@ -79,3 +84,40 @@ async def get_public_overview(db: AsyncSession = Depends(get_db)):
         unique_content_types=len(content_types),
         content_types=content_types,
     )
+
+
+@router.post("/child-safety/prompt", status_code=status.HTTP_201_CREATED)
+async def record_child_safety_prompt(
+    request: ChildSafetyPrompt,
+    db: AsyncSession = Depends(get_db),
+):
+    """Store an anonymous child-safety prompt for aggregate analytics."""
+    prompt = request.prompt.strip()
+    if not prompt:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Prompt must not be blank",
+        )
+
+    anonymous_user_id = f"anonymous-child-safety:{uuid4()}"
+    conversation = Conversations(
+        title=prompt[:120],
+        crime_type="child_safety",
+        is_child_safety=True,
+        user_id=anonymous_user_id,
+    )
+    db.add(conversation)
+    await db.flush()
+
+    db.add(
+        Messages(
+            conversation_id=conversation.id,
+            role="user",
+            content=prompt,
+            crime_type="child_safety",
+            user_id=anonymous_user_id,
+        )
+    )
+    await db.commit()
+
+    return {"recorded": True}

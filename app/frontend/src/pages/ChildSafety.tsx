@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { streamGenTxt } from "@/lib/aihub";
+import { recordChildSafetyPrompt, streamGenTxt } from "@/lib/aihub";
 import {
   Shield,
   Baby,
@@ -82,6 +82,8 @@ export default function ChildSafety() {
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
+
+    void recordChildSafetyPrompt(text.trim());
 
     // Detect language of user input
     const inputLanguage = detectLanguage(text);
@@ -605,6 +607,7 @@ export default function ChildSafety() {
                     input={input}
                     setInput={setInput}
                     isLoading={isLoading}
+                    isSlowConnection={isSlowConnection}
                     handleSubmit={handleSubmit}
                     sendMessage={sendMessage}
                     quickTopics={quickTopics}
